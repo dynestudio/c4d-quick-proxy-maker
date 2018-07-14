@@ -1,9 +1,7 @@
-'v0.1.3'
+'v0.1.3.1'
 
 import c4d
 
-
-poly_limit = 10
 doc = c4d.documents.GetActiveDocument()
 
 def get_allObjs(root_selection):
@@ -70,6 +68,13 @@ def main():
     #start undo action
     doc.StartUndo()
 
+    # main ops definitions - future dialog controls
+    poly_limit = 10
+    merge_tags = False
+    keep_parametrics = True
+    # definir correctamente cuando puede servir el keep parametrics, deberia reconocer que es un objeto original parametrico.
+    keep_originals = True
+
     obj = doc.GetActiveObject()
 
     if not obj.GetType() == c4d.Opolygon: # parametric object convert support
@@ -80,18 +85,15 @@ def main():
         doc.InsertObject(obj)
         obj_childs = get_allObjs(obj)
         # collapse parametric object
-        obj_collapse = join_objects(obj_childs[0], doc, False)
+        obj_collapse = join_objects(obj_childs[0], doc, merge_tags)
         #obj = obj_collapse
 
-        keep_parametrics = True
-        # definir correctamente cuando puede servir el keep parametrics, deberia reconocer que es un objeto original parametrico.
-
+        # keep parametrics ops
         if keep_parametrics == True:
             obj_polycount = obj_collapse.GetPolygonCount()
             if obj_polycount < poly_limit:
                 obj.Remove()
                 doc.InsertObject(obj_param)
-
 
     obj_polycount = obj.GetPolygonCount()
 
@@ -99,8 +101,11 @@ def main():
 
     if obj_polycount > poly_limit:
         print 'poly count is bigger'
-        doc.AddUndo(c4d.UNDOTYPE_DELETE,obj) # add UnDo delete to the UnDo main list
-        obj.Remove()
+        if keep_originals == False:
+            doc.AddUndo(c4d.UNDOTYPE_DELETE,obj) # add UnDo delete to the UnDo main list
+            obj.Remove()
+        else:
+            None
     else:
         print 'poly count is smaller'
     
