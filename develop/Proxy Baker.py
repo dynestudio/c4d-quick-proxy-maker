@@ -1,45 +1,69 @@
-'v01'
-
-"""
-Pending:
-
-- Definir que hacer si el objeto no es un poly object
-- Hacer editable si no es un poly obj?
-
-"""
-
+'v0.1.2'
 
 import c4d
 
 
 poly_limit = 10
+doc = c4d.documents.GetActiveDocument()
 
-def MakeEditable(op):
+def get_allObjs(root_selection):
+    def GetNextObject(op): # object manager iteration
+        if not op: return None
+        if op.GetDown(): return op.GetDown()
+        while not op.GetNext() and op.GetUp(): op = op.GetUp()
+        return op.GetNext()
 
-    if debug: print "MakeEditable()"
+    # get first obj
+    first_obj = root_selection #doc.GetFirstObject()
+    if not first_obj:
+        return None
+    # list of all objects in the scene
+    list_objs = []
+    # add the first obj
+    list_objs.append(first_obj) 
 
-    if (not op) | op.CheckType(c4d.Opolygon) | op.CheckType(c4d.Ospline): return op
+    # obj loop iteration
+    while first_obj:          
+        first_obj = GetNextObject(first_obj)
+        if first_obj:
+            list_objs.append(first_obj)
 
+    return list_objs
 
+def join_objects(root, doc, merge_tags):
+    children = root.GetChildren()
+    # set_status("Joining %d objects ..." % len(children), 50)
+    # Pre-R18 we need to pass the list of objects to join.
+    if c4d.GetC4DVersion() < 18000:
+        source = children
+    else:
+        source = [root]
 
-    op = [op.GetClone()]
+    settings = c4d.BaseContainer()
+    settings[c4d.MDATA_JOIN_MERGE_SELTAGS] = merge_tags
 
-    doc = c4d.documents.BaseDocument()
+    # collapse objects
+    result = c4d.utils.SendModelingCommand(
+        c4d.MCOMMAND_JOIN, source,
+        c4d.MODELINGCOMMANDMODE_ALL, settings, doc)
+    obj = result[0]
 
-    doc.InsertObject(op[0],None,None)
+    # delete selection tags
+    if merge_tags == False:
+        obj_tags = obj.GetTags()
+        for tag in obj_tags:
+            if tag.GetType() == c4d.Tpointselection:
+                tag.Remove()
+            elif tag.GetType() == c4d.Tedgeselection:
+                tag.Remove()
+            elif tag.GetType() == c4d.Tpolygonselection:
+                tag.Remove()
+            else:
+                None
 
-    op = c4d.utils.SendModelingCommand(
-
-                              command = c4d.MCOMMAND_MAKEEDITABLE,
-
-                              list = op,
-
-                              mode = c4d.MODELINGCOMMANDMODE_EDGESELECTION,
-
-                              doc = doc )
-
-    return op[0]
-
+    if not obj:
+        return None
+    return obj
 
 def main():
 
@@ -48,11 +72,20 @@ def main():
 
     obj = doc.GetActiveObject()
 
-    if not obj.GetType() == c4d.Opolygon:
-        obj = MakeEditable(obj)
-        print obj
-        print 'no es un polygon'
-        return
+    if not obj.GetType() == c4d.Opolygon: # parametric object convert support
+        poly_obj = c4d.utils.SendModelingCommand(c4d.MCOMMAND_MAKEEDITABLE,[obj]) ; obj = poly_obj[0]
+        doc.InsertObject(obj)
+        obj_childs = get_allObjs(obj)
+        # collapse parametric object
+        obj_collapse = join_objects(obj_childs[0], doc, False)
+        # remove parametric object
+        obj = obj_childs[0]
+        doc.AddUndo(c4d.UNDOTYPE_DELETE,obj)
+        obj.Remove()
+        # add the new polygon baked object
+        obj = obj_collapse
+        doc.InsertObject(obj)
+        doc.AddUndo(c4d.UNDOTYPE_NEW,obj)
 
     obj_polycount = obj.GetPolygonCount()
 
@@ -74,11 +107,3 @@ def main():
 
 if __name__=='__main__':
     main()
-
-
-"""
-c4d.utils.SendModelingCommand(c4d.MCOMMAND_JOIN,[objs])
-MCOMMAND_MAKEEDITABLE
-
-
-"""
