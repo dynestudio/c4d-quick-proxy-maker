@@ -1,4 +1,4 @@
-'v0.1.2'
+'v0.1.3'
 
 import c4d
 
@@ -73,19 +73,25 @@ def main():
     obj = doc.GetActiveObject()
 
     if not obj.GetType() == c4d.Opolygon: # parametric object convert support
+        obj_param = obj.GetClone() # make a parametric backup
+
+        # make a polygon object ops
         poly_obj = c4d.utils.SendModelingCommand(c4d.MCOMMAND_MAKEEDITABLE,[obj]) ; obj = poly_obj[0]
         doc.InsertObject(obj)
         obj_childs = get_allObjs(obj)
         # collapse parametric object
         obj_collapse = join_objects(obj_childs[0], doc, False)
-        # remove parametric object
-        obj = obj_childs[0]
-        doc.AddUndo(c4d.UNDOTYPE_DELETE,obj)
-        obj.Remove()
-        # add the new polygon baked object
-        obj = obj_collapse
-        doc.InsertObject(obj)
-        doc.AddUndo(c4d.UNDOTYPE_NEW,obj)
+        #obj = obj_collapse
+
+        keep_parametrics = True
+        # definir correctamente cuando puede servir el keep parametrics, deberia reconocer que es un objeto original parametrico.
+
+        if keep_parametrics == True:
+            obj_polycount = obj_collapse.GetPolygonCount()
+            if obj_polycount < poly_limit:
+                obj.Remove()
+                doc.InsertObject(obj_param)
+
 
     obj_polycount = obj.GetPolygonCount()
 
