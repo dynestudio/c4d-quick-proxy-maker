@@ -1,4 +1,4 @@
-'v0.1.4'
+'v0.1.5'
 
 import c4d
 
@@ -63,18 +63,55 @@ def join_objects(root, doc, merge_tags):
         return None
     return obj
 
-def main():
+def create_c4d_obj(Obj_ID, name): # create custom objects
+    obj = c4d.BaseObject(Obj_ID)
+    obj[c4d.ID_BASELIST_NAME] = name
+    doc.InsertObject(obj)
+    c4d.EventAdd() ; return obj
 
+def add_BBox(source, target):
+    # prevent type errors
+    if not target or not target.CheckType(c4d.Opoint): return False
+    if not source: return False
+ 
+    tBB = target.GetRad()   # Target BoundingBox
+    sBB = source.GetRad()   # Source BoundingBox
+
+    sSc = source[c4d.ID_BASEOBJECT_ABS_SCALE] # Source Scale
+    sP = source[c4d.ID_BASEOBJECT_ABS_POSITION] # Source Position
+    sR = source[c4d.ID_BASEOBJECT_ABS_ROTATION] # Source Rotation
+ 
+    try:    xdif = sBB.x / tBB.x 
+    except: xdif = 1.0
+    try:    ydif = sBB.y / tBB.y 
+    except: ydif = 1.0
+    try:    zdif = sBB.z / tBB.z 
+    except: zdif = 1.0
+ 
+    for i in xrange(target.GetPointCount()):
+        ppos = target.GetPoint(i)
+        target.SetPoint(i,c4d.Vector(ppos.x * xdif * sSc.x , ppos.y * ydif * sSc.y , ppos.z * zdif * sSc.z))
+        
+    target[c4d.ID_BASEOBJECT_ABS_SCALE]     = sSc
+    target[c4d.ID_BASEOBJECT_ABS_POSITION]  = sP
+    target[c4d.ID_BASEOBJECT_ABS_ROTATION]  = sR
+
+    target.Message(c4d.MSG_UPDATE)
+
+    return target
+
+def main():
     #start undo action
     doc.StartUndo()
 
     # main ops definitions - future dialog controls
     poly_limit = 10
     merge_tags = False
-    keep_parametrics = True
+    keep_parametrics = False
     threshold_parametric = 0.5
     # definir correctamente cuando puede servir el keep parametrics, deberia reconocer que es un objeto original parametrico.
     keep_originals = False
+    add_boundingbox = False
 
     obj = doc.GetActiveObject()
 
@@ -91,7 +128,7 @@ def main():
         # keep parametrics ops
         if keep_parametrics == True:
             obj_polycount = obj_collapse.GetPolygonCount() ; obj_polycount = int(float(obj_polycount) * threshold_parametric)
-            print obj_polycount
+            print 'Parametric poly count: ' + str(obj_polycount)
             if obj_polycount < poly_limit:
                 obj.Remove()
                 doc.InsertObject(obj_param)
@@ -102,6 +139,12 @@ def main():
 
     if obj_polycount > poly_limit:
         print 'poly count is bigger'
+        if add_boundingbox == True:
+            bbox = create_c4d_obj(c4d.Ocube, obj[c4d.ID_BASELIST_NAME] + '_bbox')
+            bbox = c4d.utils.SendModelingCommand(c4d.MCOMMAND_MAKEEDITABLE,[bbox]) ; bbox = bbox[0]
+            doc.InsertObject(bbox)
+            obj_bbox = add_BBox(obj,bbox)
+
         if keep_originals == False:
             doc.AddUndo(c4d.UNDOTYPE_DELETE,obj) # add UnDo delete to the UnDo main list
             obj.Remove()
