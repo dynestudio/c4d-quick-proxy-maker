@@ -1,4 +1,4 @@
-'v0.1.3.3'
+'v0.1.4'
 
 import c4d
 
@@ -72,8 +72,9 @@ def main():
     poly_limit = 10
     merge_tags = False
     keep_parametrics = True
+    threshold_parametric = 0.5
     # definir correctamente cuando puede servir el keep parametrics, deberia reconocer que es un objeto original parametrico.
-    keep_originals = True
+    keep_originals = False
 
     obj = doc.GetActiveObject()
 
@@ -86,11 +87,11 @@ def main():
         obj_childs = get_allObjs(obj)
         # collapse parametric object
         obj_collapse = join_objects(obj_childs[0], doc, merge_tags)
-        #obj = obj_collapse
 
         # keep parametrics ops
         if keep_parametrics == True:
-            obj_polycount = obj_collapse.GetPolygonCount()
+            obj_polycount = obj_collapse.GetPolygonCount() ; obj_polycount = int(float(obj_polycount) * threshold_parametric)
+            print obj_polycount
             if obj_polycount < poly_limit:
                 obj.Remove()
                 doc.InsertObject(obj_param)
